@@ -509,6 +509,7 @@
 
 &i2c4 {
 	status = "okay";
+	clock-frequency = <400000>;
 
 	sm5714-charger@49 {
 		compatible = "siliconmitus,sm5714-charger";
@@ -805,6 +806,7 @@
 &spi6 {
 	/* Himax HX83102E TDDI SPI touchscreen sits at cs0 (irq tlmm 9, rst tlmm 32, 7 MHz) */
 	status = "okay";
+	pinctrl-0 = <&qup_spi6_spi>, <&qup_spi6_cs_gpio>;
 	cs-gpios = <&tlmm 62 GPIO_ACTIVE_LOW>;
 };
 

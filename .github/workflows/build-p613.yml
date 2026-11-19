@@ -40,13 +40,24 @@ jobs:
             arch/arm64/configs/p613.config
           make O=out ARCH=arm64 LLVM=1 LLVM_IAS=1 olddefconfig
           cp out/.config out/p613_effective.config
+          # Fail fast if critical Android / P613 options were silently dropped by Kconfig
+          for opt in \
+            'CONFIG_SECURITY_SELINUX=y' \
+            'CONFIG_SECURITY_SELINUX_DEVELOP=y' \
+            'CONFIG_ANDROID_BINDERFS=y' \
+            'CONFIG_USB_CONFIGFS_F_FS=y' \
+            'CONFIG_PSTORE_RAM=y' \
+            'CONFIG_DRM_SIMPLEDRM=y'; do
+            grep -qx "$opt" out/.config || { echo "MISSING REQUIRED CONFIG: $opt"; exit 1; }
+          done
+          grep -qE '^CONFIG_LSM=".*selinux.*"' out/.config || { echo "SELinux missing from CONFIG_LSM!"; exit 1; }
 
       - name: Fast Check (P613 DTB & SM7125/P613 Drivers)
         run: |
           set -o pipefail
           export CCACHE_DIR="$HOME/.cache/ccache"
           ccache --max-size=2G
-          make O=out ARCH=arm64 LLVM=1 LLVM_IAS=1 CC="ccache clang" -j$(nproc) \
+          make O=out ARCH=arm64 LLVM=1 LLVM_IAS=1 DTC_FLAGS="-@" CC="ccache clang" -j$(nproc) \
             qcom/sm7125-samsung-gta4xlvewifi.dtb \
             drivers/firmware/qcom/qcom_tzmem.o \
             drivers/soc/qcom/qcom_pd_mapper.o \
@@ -61,7 +72,7 @@ jobs:
         run: |
           set -o pipefail
           export CCACHE_DIR="$HOME/.cache/ccache"
-          make O=out ARCH=arm64 LLVM=1 LLVM_IAS=1 CC="ccache clang" -j$(nproc) \
+          make O=out ARCH=arm64 LLVM=1 LLVM_IAS=1 DTC_FLAGS="-@" CC="ccache clang" -j$(nproc) \
             Image.gz \
             qcom/sm7125-samsung-gta4xlvewifi.dtb \
             modules 2>&1 | tee build.log
