@@ -1,0 +1,99 @@
+name: Build SM-P613 (gta4xlvewifi) Kernel (android18-7.3)
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [ "android18-7.3", "p613/**" ]
+
+jobs:
+  build:
+    name: Build arm64 Kernel & DTB (SM-P613)
+    runs-on: ubuntu-24.04
+
+    steps:
+      - name: Checkout Source
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 1
+
+      - name: Install Build Dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y \
+            bc bison build-essential ccache clang cpio device-tree-compiler \
+            dwarves flex kmod libelf-dev libssl-dev lld llvm python3 rsync zip
+
+      - name: Configure Kernel (defconfig + sm7125.config + p613.config)
+        run: |
+          mkdir -p out
+          make O=out ARCH=arm64 LLVM=1 LLVM_IAS=1 defconfig
+          scripts/kconfig/merge_config.sh -m -O out out/.config \
+            arch/arm64/configs/sm7125.config \
+            arch/arm64/configs/p613.config
+          make O=out ARCH=arm64 LLVM=1 LLVM_IAS=1 olddefconfig
+          cp out/.config out/p613_effective.config
+
+      - name: Build Image.gz, SM-P613 DTB, and Modules
+        run: |
+          set -o pipefail
+          make O=out ARCH=arm64 LLVM=1 LLVM_IAS=1 -j$(nproc) \
+            Image.gz \
+            qcom/sm7125-samsung-gta4xlvewifi.dtb \
+            modules 2>&1 | tee build.log
+
+      - name: Stage Artifacts & AnyKernel3 ZIP
+        run: |
+          mkdir -p dist
+          cp out/arch/arm64/boot/Image.gz dist/Image.gz
+          cp out/arch/arm64/boot/dts/qcom/sm7125-samsung-gta4xlvewifi.dtb dist/sm7125-samsung-gta4xlvewifi.dtb
+          cp out/p613_effective.config dist/p613_effective.config
+
+          make O=out ARCH=arm64 LLVM=1 LLVM_IAS=1 \
+            INSTALL_MOD_PATH="$PWD/out/modules_install" \
+            INSTALL_MOD_STRIP=1 \
+            modules_install
+          tar -czf dist/modules.tar.gz -C out/modules_install .
+
+          git clone --depth=1 https://github.com/osm0sis/AnyKernel3.git anykernel
+          cd anykernel
+          rm -rf .git* README.md
+          cp ../dist/Image.gz ./Image.gz
+          cp ../dist/sm7125-samsung-gta4xlvewifi.dtb ./dtb
+          cat > anykernel.sh << 'EOF'
+          ### AnyKernel3 Ramdisk Mod Script
+          properties() { '
+          kernel.string=SM-P613 Mainline android18-7.3
+          do.devicecheck=0
+          do.modules=0
+          do.systemless=1
+          do.cleanup=1
+          do.cleanuponabort=0
+          supported.versions=
+          '; }
+
+          block=/dev/block/bootdevice/by-name/boot;
+          is_slot_device=0;
+          ramdisk_compression=auto;
+          patch_vbmeta_flag=auto;
+          boot_img_hdr_ver=2;
+
+          . tools/ak3-core.sh;
+
+          split_boot;
+          flash_boot;
+          EOF
+          chmod +x anykernel.sh
+          zip -r9 ../dist/p613-android18-7.3-$(date +%Y%m%d).zip .
+
+      - name: Upload Kernel Artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: p613-android18-7.3-build
+          path: dist/
+
+      - name: Upload Build Log
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: p613-build-log
+          path: build.log
