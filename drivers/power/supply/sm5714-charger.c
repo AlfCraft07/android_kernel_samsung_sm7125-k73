@@ -91,22 +91,29 @@ static int sm5714_charger_get_property(struct power_supply *psy,
 
 	int status = POWER_SUPPLY_STATUS_UNKNOWN;
 	int health = POWER_SUPPLY_HEALTH_UNKNOWN;
-	unsigned int reg_st1, reg_st2, reg_st3;
+	unsigned int reg_st1, reg_st2;
 
 	drv = power_supply_get_drvdata(psy);
 	switch (psp) {
 	case POWER_SUPPLY_PROP_PRESENT:
 		error = regmap_read(drv->regmap, SM5714_CHG_REG_STATUS2, &value);
+		if (error)
+			return error;
 		val->intval = (value & (0x1 << 2)) ? 0 : 1;
 		break;
 	case POWER_SUPPLY_PROP_ONLINE:
 		error = regmap_read(drv->regmap, SM5714_CHG_REG_STATUS1, &value);
+		if (error)
+			return error;
 		val->intval = value & 0x1 ? 1 : 0;
 		break;
 	case POWER_SUPPLY_PROP_STATUS:
 		error = regmap_read(drv->regmap, SM5714_CHG_REG_STATUS1, &reg_st1);
+		if (error)
+			return error;
 		error = regmap_read(drv->regmap, SM5714_CHG_REG_STATUS2, &reg_st2);
-		error = regmap_read(drv->regmap, SM5714_CHG_REG_STATUS3, &reg_st3);
+		if (error)
+			return error;
 
 		if (reg_st2 & (0x1 << 5))
 			status = POWER_SUPPLY_STATUS_FULL;
@@ -122,6 +129,8 @@ static int sm5714_charger_get_property(struct power_supply *psy,
 		break;
 	case POWER_SUPPLY_PROP_HEALTH:
 		error = regmap_read(drv->regmap, SM5714_CHG_REG_STATUS1, &value);
+		if (error)
+			return error;
 		if (value & (0x1 << 0))
 			health = POWER_SUPPLY_HEALTH_GOOD;
 		else {
@@ -160,7 +169,7 @@ static int sm5714_charger_probe(struct i2c_client *i2c)
 	struct device *dev = &i2c->dev;
 	struct power_supply_config charger_cfg = {};
 	struct sm5714_charger *drv;
-	int input_current_limit = 500, charging_current = 500, topoff_current = 100;
+	u32 input_current_limit = 500, charging_current = 500, topoff_current = 100;
 
 	drv = devm_kzalloc(&i2c->dev, sizeof(*drv), GFP_KERNEL);
 	if (!drv)

@@ -77,13 +77,15 @@ static int sm5714_fg_get_property(struct power_supply *psy,
 				   union power_supply_propval *val)
 {
 	int error;
-	unsigned int value;
+	int value;
 	struct sm5714_fg *drv;
 
 	drv = power_supply_get_drvdata(psy);
 	switch (psp) {
 	case POWER_SUPPLY_PROP_STATUS:
 		error = sm5714_fg_get_status(&value);
+		if (error)
+			return error;
 		val->intval = value;
 		break;
 	case POWER_SUPPLY_PROP_TEMP:

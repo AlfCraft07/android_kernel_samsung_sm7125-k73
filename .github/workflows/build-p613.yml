@@ -23,6 +23,14 @@ jobs:
             bc bison build-essential ccache clang cpio device-tree-compiler \
             dwarves flex kmod libelf-dev libssl-dev lld llvm python3 rsync zip
 
+      - name: Cache ccache
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/ccache
+          key: ${{ runner.os }}-p613-ccache-${{ github.sha }}
+          restore-keys: |
+            ${{ runner.os }}-p613-ccache-
+
       - name: Configure Kernel (defconfig + sm7125.config + p613.config)
         run: |
           mkdir -p out
@@ -33,13 +41,31 @@ jobs:
           make O=out ARCH=arm64 LLVM=1 LLVM_IAS=1 olddefconfig
           cp out/.config out/p613_effective.config
 
+      - name: Fast Check (P613 DTB & SM7125/P613 Drivers)
+        run: |
+          set -o pipefail
+          export CCACHE_DIR="$HOME/.cache/ccache"
+          ccache --max-size=2G
+          make O=out ARCH=arm64 LLVM=1 LLVM_IAS=1 CC="ccache clang" -j$(nproc) \
+            qcom/sm7125-samsung-gta4xlvewifi.dtb \
+            drivers/firmware/qcom/qcom_tzmem.o \
+            drivers/soc/qcom/qcom_pd_mapper.o \
+            drivers/gpu/drm/msm/adreno/a6xx_catalog.o \
+            drivers/gpu/drm/panel/panel-himax-hx83102.o \
+            drivers/regulator/isl98608-regulator.o \
+            drivers/power/supply/sm5714-charger.o \
+            drivers/power/supply/sm5714-fg.o \
+            sound/soc/qcom/sm8250.o 2>&1 | tee fastcheck.log
+
       - name: Build Image.gz, SM-P613 DTB, and Modules
         run: |
           set -o pipefail
-          make O=out ARCH=arm64 LLVM=1 LLVM_IAS=1 -j$(nproc) \
+          export CCACHE_DIR="$HOME/.cache/ccache"
+          make O=out ARCH=arm64 LLVM=1 LLVM_IAS=1 CC="ccache clang" -j$(nproc) \
             Image.gz \
             qcom/sm7125-samsung-gta4xlvewifi.dtb \
             modules 2>&1 | tee build.log
+          ccache -s
 
       - name: Stage Artifacts & AnyKernel3 ZIP
         run: |
@@ -91,9 +117,12 @@ jobs:
           name: p613-android18-7.3-build
           path: dist/
 
-      - name: Upload Build Log
+      - name: Upload Build Logs
         if: always()
         uses: actions/upload-artifact@v4
         with:
           name: p613-build-log
-          path: build.log
+          path: |
+            fastcheck.log
+            build.log
+          if-no-files-found: ignore
