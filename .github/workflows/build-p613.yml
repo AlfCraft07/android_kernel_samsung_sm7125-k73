@@ -5,6 +5,10 @@ on:
   push:
     branches: [ "android18-7.3", "p613/**" ]
 
+concurrency:
+  group: p613-build-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
   build:
     name: Build arm64 Kernel & DTB (SM-P613)
