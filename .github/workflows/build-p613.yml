@@ -51,7 +51,8 @@ jobs:
             'CONFIG_ANDROID_BINDERFS=y' \
             'CONFIG_USB_CONFIGFS_F_FS=y' \
             'CONFIG_PSTORE_RAM=y' \
-            'CONFIG_DRM_SIMPLEDRM=y'; do
+            'CONFIG_DRM_SIMPLEDRM=y' \
+            'CONFIG_REGULATOR_QCOM_REFGEN=y'; do
             grep -qx "$opt" out/.config || { echo "MISSING REQUIRED CONFIG: $opt"; exit 1; }
           done
           grep -qE '^CONFIG_LSM=".*selinux.*"' out/.config || { echo "SELinux missing from CONFIG_LSM!"; exit 1; }
