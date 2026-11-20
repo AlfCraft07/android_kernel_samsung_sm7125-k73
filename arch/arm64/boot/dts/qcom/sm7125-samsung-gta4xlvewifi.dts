@@ -605,9 +605,15 @@
 
 &pm6150_pon {
 	/*
-	 * Samsung LinuxLoader strips fastboot commands; reboot to Odin download mode instead.
+	 * Samsung ABL writes param.bootingNow = 2 (PARAM_BOOT_RECOVERY_ENTER)
+	 * on VolUp+Power recovery entry and only clears it when PON_SOFT_RB_SPARE
+	 * carries PON_RESTART_REASON_NORMALBOOT (0x14). Without mode-normal,
+	 * rebooting from recovery loops back into recovery.
+	 * Samsung LinuxLoader strips fastboot; map bootloader/download to Odin (0x15).
 	 */
+	mode-normal = <0x14>;
 	mode-bootloader = <0x15>;
+	mode-download = <0x15>;
 };
 
 &pm6150_resin {
