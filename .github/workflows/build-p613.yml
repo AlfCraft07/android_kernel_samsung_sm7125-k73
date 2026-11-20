@@ -53,7 +53,9 @@ jobs:
             'CONFIG_PSTORE_RAM=y' \
             'CONFIG_DRM_SIMPLEDRM=y' \
             'CONFIG_REGULATOR_QCOM_REFGEN=y' \
-            'CONFIG_TOUCHSCREEN_HIMAX_HX83102_SPI=y'; do
+            'CONFIG_TOUCHSCREEN_HIMAX_HX83102_SPI=y' \
+            'CONFIG_BOOT_CONFIG_EMBED=y' \
+            'CONFIG_ZRAM=y'; do
             grep -qx "$opt" out/.config || { echo "MISSING REQUIRED CONFIG: $opt"; exit 1; }
           done
           grep -qE '^CONFIG_LSM=".*selinux.*"' out/.config || { echo "SELinux missing from CONFIG_LSM!"; exit 1; }

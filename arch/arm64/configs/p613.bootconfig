@@ -1,0 +1,2 @@
+androidboot.boot_devices = "soc@0/1d84000.ufshc"
+androidboot.usbcontroller = "a600000.usb"
