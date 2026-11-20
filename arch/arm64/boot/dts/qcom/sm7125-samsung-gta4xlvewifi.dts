@@ -809,11 +809,41 @@
 	};
 };
 
+&qup_spi6_spi {
+	drive-strength = <6>;
+	bias-disable;
+};
+
+&qup_spi6_cs_gpio {
+	drive-strength = <6>;
+	bias-disable;
+};
+
 &spi6 {
 	/* Himax HX83102E TDDI SPI touchscreen sits at cs0 (irq tlmm 9, rst tlmm 32, 7 MHz) */
 	status = "okay";
 	pinctrl-0 = <&qup_spi6_spi>, <&qup_spi6_cs_gpio>;
 	cs-gpios = <&tlmm 62 GPIO_ACTIVE_LOW>;
+
+	touchscreen@0 {
+		compatible = "himax,hx83102e-spi";
+		reg = <0>;
+		spi-max-frequency = <7000000>;
+		spi-cpol;
+		spi-cpha;
+
+		interrupt-parent = <&tlmm>;
+		interrupts = <9 IRQ_TYPE_EDGE_FALLING>;
+
+		reset-gpios = <&tlmm 32 GPIO_ACTIVE_LOW>;
+		vddi-supply = <&vreg_l13a_1p8>;
+
+		pinctrl-names = "default";
+		pinctrl-0 = <&ts_int_default>, <&ts_rst_default>;
+
+		touchscreen-size-x = <1200>;
+		touchscreen-size-y = <2000>;
+	};
 };
 
 &swr1 {
@@ -860,6 +890,13 @@
 		pins = "gpio9";
 		function = "gpio";
 		input-enable;
+		bias-disable;
+	};
+
+	ts_rst_default: ts-rst-default-state {
+		pins = "gpio32";
+		function = "gpio";
+		drive-strength = <2>;
 		bias-disable;
 	};
 

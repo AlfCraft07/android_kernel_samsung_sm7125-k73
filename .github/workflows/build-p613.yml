@@ -52,7 +52,8 @@ jobs:
             'CONFIG_USB_CONFIGFS_F_FS=y' \
             'CONFIG_PSTORE_RAM=y' \
             'CONFIG_DRM_SIMPLEDRM=y' \
-            'CONFIG_REGULATOR_QCOM_REFGEN=y'; do
+            'CONFIG_REGULATOR_QCOM_REFGEN=y' \
+            'CONFIG_TOUCHSCREEN_HIMAX_HX83102_SPI=y'; do
             grep -qx "$opt" out/.config || { echo "MISSING REQUIRED CONFIG: $opt"; exit 1; }
           done
           grep -qE '^CONFIG_LSM=".*selinux.*"' out/.config || { echo "SELinux missing from CONFIG_LSM!"; exit 1; }
@@ -68,6 +69,7 @@ jobs:
             drivers/soc/qcom/qcom_pd_mapper.o \
             drivers/gpu/drm/msm/adreno/a6xx_catalog.o \
             drivers/gpu/drm/panel/panel-himax-hx83102.o \
+            drivers/input/touchscreen/himax_hx83102_spi.o \
             drivers/regulator/isl98608-regulator.o \
             drivers/power/supply/sm5714-charger.o \
             drivers/power/supply/sm5714-fg.o \
