@@ -703,7 +703,7 @@
 
 &remoteproc_mpss {
 	memory-region = <&mpss_mem>;
-	firmware-name = "qcom/sm7125/Samsung/gta4xlvewifi/wlanmdsp.mbn";
+	firmware-name = "qcom/sm7125/Samsung/gta4xlvewifi/modem.mbn";
 
 	status = "okay";
 };
@@ -1026,7 +1026,7 @@
 	status = "okay";
 
 	bluetooth: bluetooth {
-		compatible = "qcom,wcn3988-bt";
+		compatible = "qcom,wcn3990-bt";
 
 		vddio-supply = <&vreg_l10a_1p8>;
 		vddxo-supply = <&vreg_l1c_1p8>;
