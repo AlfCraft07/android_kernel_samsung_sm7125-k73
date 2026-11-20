@@ -88,6 +88,8 @@ static unsigned int get_reboot_mode_magic(struct reboot_mode_driver *reboot,
 
 	/* try to match again, replacing characters impossible in DT */
 	if (strscpy(cmd_, cmd, sizeof(cmd_)) != -E2BIG) {
+		char *sep;
+
 		strreplace(cmd_, ' ', '-');
 		strreplace(cmd_, ',', '-');
 		strreplace(cmd_, '/', '-');
@@ -95,6 +97,21 @@ static unsigned int get_reboot_mode_magic(struct reboot_mode_driver *reboot,
 		list_for_each_entry(info, &reboot->head, list)
 			if (!strcmp(info->mode, cmd_))
 				return info->magic;
+
+		/*
+		 * Android reboot reasons append sub-reasons after a comma
+		 * (e.g. "bootloader,bootstrap-apexd-failed", "recovery,quiescent").
+		 * Match the leading target before the first comma if defined.
+		 */
+		sep = strchr(cmd, ',');
+		if (sep && (size_t)(sep - cmd) < sizeof(cmd_)) {
+			memcpy(cmd_, cmd, sep - cmd);
+			cmd_[sep - cmd] = '\0';
+
+			list_for_each_entry(info, &reboot->head, list)
+				if (!strcmp(info->mode, cmd_))
+					return info->magic;
+		}
 	}
 
 	/*
