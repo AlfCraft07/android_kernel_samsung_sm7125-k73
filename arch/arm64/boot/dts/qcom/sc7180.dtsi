@@ -2303,7 +2303,7 @@
 			power-domains = <&gpucc CX_GDSC>;
 		};
 
-		kgsl_3d0: qcom,kgsl-3d0@5000000 {
+		gpu: kgsl_3d0: qcom,kgsl-3d0@5000000 {
 			label = "kgsl-3d0";
 			compatible = "qcom,kgsl-3d0", "qcom,kgsl-3d";
 			status = "ok";
@@ -2320,6 +2320,8 @@
 			qcom,chipid = <0x06010800>; /* Adreno 618 */
 
 			iommus = <&adreno_smmu 0>;
+
+			#cooling-cells = <2>;
 
 			interconnects = <&gem_noc MASTER_GFX3D 0 &mc_virt SLAVE_EBI1 0>;
 			interconnect-names = "gfx-mem";
