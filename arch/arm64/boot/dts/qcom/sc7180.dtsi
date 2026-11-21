@@ -2280,159 +2280,124 @@
 			};
 		};
 
-		gpu: gpu@5000000 {
-			compatible = "qcom,adreno-618.0", "qcom,adreno";
-			reg = <0 0x05000000 0 0x40000>, <0 0x0509e000 0 0x1000>,
-				<0 0x05061000 0 0x800>;
+		kgsl_3d0: qcom,kgsl-3d0@5000000 {
+			label = "kgsl-3d0";
+			compatible = "qcom,kgsl-3d0", "qcom,kgsl-3d";
+			status = "ok";
+
+			reg = <0 0x05000000 0 0x40000>,
+			      <0 0x0509e000 0 0x1000>,
+			      <0 0x05061000 0 0x800>;
 			reg-names = "kgsl_3d0_reg_memory", "cx_mem", "cx_dbgc";
+
 			interrupts = <GIC_SPI 300 IRQ_TYPE_LEVEL_HIGH>;
+			interrupt-names = "kgsl_3d0_irq";
+
+			qcom,id = <0>;
+			qcom,chipid = <0x06010800>; /* Adreno 618 */
+
+			clocks = <&gpucc GPU_CC_AHB_CLK>,
+				 <&gpucc GPU_CC_CX_GFX3D_CLK>;
+			clock-names = "iface_clk", "core_clk";
+
+			/* SMMU binding */
 			iommus = <&adreno_smmu 0>;
-			operating-points-v2 = <&gpu_opp_table>;
-			qcom,gmu = <&gmu>;
 
-			#cooling-cells = <2>;
-
-			nvmem-cells = <&gpu_speed_bin>;
-			nvmem-cell-names = "speed_bin";
-
-			interconnects = <&gem_noc MASTER_GFX3D 0 &mc_virt SLAVE_EBI1 0>;
-			interconnect-names = "gfx-mem";
-
-			gpu_zap_shader: zap-shader {
+			/* Zap Shader region from reserved-memory */
+			qcom,gpu-quirk-secvid;
+			zap-shader {
 				memory-region = <&gpu_mem>;
 			};
 
-			gpu_opp_table: opp-table {
-				compatible = "operating-points-v2";
+			/* Interconnect / Bus bandwidth scaling */
+			interconnects = <&gem_noc MASTER_GFX3D 0 &mc_virt SLAVE_EBI1 0>;
+			interconnect-names = "gfx-mem";
 
-				opp-825000000 {
-					opp-hz = /bits/ 64 <825000000>;
-					opp-level = <RPMH_REGULATOR_LEVEL_TURBO_L1>;
-					opp-peak-kBps = <8532000>;
-					opp-supported-hw = <0x04>;
+			/* GMU child device */
+			gmu: qcom,gmu@506a000 {
+				compatible = "qcom,gmu";
+				reg = <0 0x0506a000 0 0x31000>,
+				      <0 0x0b290000 0 0x10000>,
+				      <0 0x0b490000 0 0x10000>;
+				reg-names = "kgsl_gmu_reg", "kgsl_gmu_pdc_cfg", "kgsl_gmu_pdc_seq";
+
+				interrupts = <GIC_SPI 304 IRQ_TYPE_LEVEL_HIGH>,
+					     <GIC_SPI 305 IRQ_TYPE_LEVEL_HIGH>;
+				interrupt-names = "kgsl_hfi_irq", "kgsl_gmu_irq";
+
+				clocks = <&gpucc GPU_CC_CX_GMU_CLK>,
+					 <&gpucc GPU_CC_CXO_CLK>,
+					 <&gcc GCC_DDRSS_GPU_AXI_CLK>,
+					 <&gcc GCC_GPU_MEMNOC_GFX_CLK>;
+				clock-names = "gmu_clk", "cxo_clk", "axi_clk", "memnoc_clk";
+
+				power-domains = <&gpucc CX_GDSC>, <&gpucc GX_GDSC>;
+				power-domain-names = "cx", "gx";
+
+				iommus = <&adreno_smmu 5>;
+			};
+
+			/* Adreno 618 Power Levels (derived from RPMh / OPP table) */
+			qcom,gpu-pwrlevels {
+				#address-cells = <1>;
+				#size-cells = <0>;
+
+				compatible = "qcom,gpu-pwrlevels";
+
+				qcom,gpu-pwrlevel@0 {
+					reg = <0>;
+					qcom,gpu-freq = <825000000>;
+					qcom,bus-freq = <8532000>;
 				};
 
-				opp-800000000 {
-					opp-hz = /bits/ 64 <800000000>;
-					opp-level = <RPMH_REGULATOR_LEVEL_TURBO>;
-					opp-peak-kBps = <8532000>;
-					opp-supported-hw = <0x07>;
+				qcom,gpu-pwrlevel@1 {
+					reg = <1>;
+					qcom,gpu-freq = <800000000>;
+					qcom,bus-freq = <8532000>;
 				};
 
-				opp-750000000 {
-					opp-hz = /bits/ 64 <750000000>;
-					opp-level = <RPMH_REGULATOR_LEVEL_NOM_L1>;
-					opp-peak-kBps = <7216000>;
-					opp-supported-hw = <0x08>;
+				qcom,gpu-pwrlevel@2 {
+					reg = <2>;
+					qcom,gpu-freq = <750000000>;
+					qcom,bus-freq = <7216000>;
 				};
 
-				opp-650000000 {
-					opp-hz = /bits/ 64 <650000000>;
-					opp-level = <RPMH_REGULATOR_LEVEL_NOM_L1>;
-					opp-peak-kBps = <7216000>;
-					opp-supported-hw = <0x0f>;
+				qcom,gpu-pwrlevel@3 {
+					reg = <3>;
+					qcom,gpu-freq = <650000000>;
+					qcom,bus-freq = <7216000>;
 				};
 
-				opp-565000000 {
-					opp-hz = /bits/ 64 <565000000>;
-					opp-level = <RPMH_REGULATOR_LEVEL_NOM>;
-					opp-peak-kBps = <5412000>;
-					opp-supported-hw = <0x0f>;
+				qcom,gpu-pwrlevel@4 {
+					reg = <4>;
+					qcom,gpu-freq = <565000000>;
+					qcom,bus-freq = <5412000>;
 				};
 
-				opp-430000000 {
-					opp-hz = /bits/ 64 <430000000>;
-					opp-level = <RPMH_REGULATOR_LEVEL_SVS_L1>;
-					opp-peak-kBps = <5412000>;
-					opp-supported-hw = <0x0f>;
+				qcom,gpu-pwrlevel@5 {
+					reg = <5>;
+					qcom,gpu-freq = <430000000>;
+					qcom,bus-freq = <5412000>;
 				};
 
-				opp-355000000 {
-					opp-hz = /bits/ 64 <355000000>;
-					opp-level = <RPMH_REGULATOR_LEVEL_SVS>;
-					opp-peak-kBps = <3072000>;
-					opp-supported-hw = <0x0f>;
+				qcom,gpu-pwrlevel@6 {
+					reg = <6>;
+					qcom,gpu-freq = <355000000>;
+					qcom,bus-freq = <3072000>;
 				};
 
-				opp-267000000 {
-					opp-hz = /bits/ 64 <267000000>;
-					opp-level = <RPMH_REGULATOR_LEVEL_LOW_SVS>;
-					opp-peak-kBps = <3072000>;
-					opp-supported-hw = <0x0f>;
+				qcom,gpu-pwrlevel@7 {
+					reg = <7>;
+					qcom,gpu-freq = <267000000>;
+					qcom,bus-freq = <3072000>;
 				};
 
-				opp-180000000 {
-					opp-hz = /bits/ 64 <180000000>;
-					opp-level = <RPMH_REGULATOR_LEVEL_MIN_SVS>;
-					opp-peak-kBps = <1804000>;
-					opp-supported-hw = <0x0f>;
+				qcom,gpu-pwrlevel@8 {
+					reg = <8>;
+					qcom,gpu-freq = <180000000>;
+					qcom,bus-freq = <1804000>;
 				};
 			};
-		};
-
-		adreno_smmu: iommu@5040000 {
-			compatible = "qcom,sc7180-smmu-v2", "qcom,adreno-smmu", "qcom,smmu-v2";
-			reg = <0 0x05040000 0 0x10000>;
-			#iommu-cells = <1>;
-			#global-interrupts = <2>;
-			interrupts = <GIC_SPI 229 IRQ_TYPE_LEVEL_HIGH>,
-					<GIC_SPI 231 IRQ_TYPE_LEVEL_HIGH>,
-					<GIC_SPI 364 IRQ_TYPE_EDGE_RISING>,
-					<GIC_SPI 365 IRQ_TYPE_EDGE_RISING>,
-					<GIC_SPI 366 IRQ_TYPE_EDGE_RISING>,
-					<GIC_SPI 367 IRQ_TYPE_EDGE_RISING>,
-					<GIC_SPI 368 IRQ_TYPE_EDGE_RISING>,
-					<GIC_SPI 369 IRQ_TYPE_EDGE_RISING>,
-					<GIC_SPI 370 IRQ_TYPE_EDGE_RISING>,
-					<GIC_SPI 371 IRQ_TYPE_EDGE_RISING>;
-
-			clocks = <&gcc GCC_GPU_MEMNOC_GFX_CLK>,
-				<&gcc GCC_GPU_CFG_AHB_CLK>;
-			clock-names = "bus", "iface";
-
-			power-domains = <&gpucc CX_GDSC>;
-		};
-
-		gmu: gmu@506a000 {
-			compatible = "qcom,adreno-gmu-618.0", "qcom,adreno-gmu";
-			reg = <0 0x0506a000 0 0x31000>, <0 0x0b290000 0 0x10000>,
-				<0 0x0b490000 0 0x10000>;
-			reg-names = "gmu", "gmu_pdc", "gmu_pdc_seq";
-			interrupts = <GIC_SPI 304 IRQ_TYPE_LEVEL_HIGH>,
-				   <GIC_SPI 305 IRQ_TYPE_LEVEL_HIGH>;
-			interrupt-names = "hfi", "gmu";
-			clocks = <&gpucc GPU_CC_CX_GMU_CLK>,
-			       <&gpucc GPU_CC_CXO_CLK>,
-			       <&gcc GCC_DDRSS_GPU_AXI_CLK>,
-			       <&gcc GCC_GPU_MEMNOC_GFX_CLK>;
-			clock-names = "gmu", "cxo", "axi", "memnoc";
-			power-domains = <&gpucc CX_GDSC>, <&gpucc GX_GDSC>;
-			power-domain-names = "cx", "gx";
-			iommus = <&adreno_smmu 5>;
-			operating-points-v2 = <&gmu_opp_table>;
-
-			gmu_opp_table: opp-table {
-				compatible = "operating-points-v2";
-
-				opp-200000000 {
-					opp-hz = /bits/ 64 <200000000>;
-					opp-level = <RPMH_REGULATOR_LEVEL_MIN_SVS>;
-				};
-			};
-		};
-
-		gpucc: clock-controller@5090000 {
-			compatible = "qcom,sc7180-gpucc";
-			reg = <0 0x05090000 0 0x9000>;
-			clocks = <&rpmhcc RPMH_CXO_CLK>,
-				 <&gcc GCC_GPU_GPLL0_CLK_SRC>,
-				 <&gcc GCC_GPU_GPLL0_DIV_CLK_SRC>;
-			clock-names = "bi_tcxo",
-				      "gcc_gpu_gpll0_clk_src",
-				      "gcc_gpu_gpll0_div_clk_src";
-			#clock-cells = <1>;
-			#reset-cells = <1>;
-			#power-domain-cells = <1>;
 		};
 
 		dma@10a2000 {

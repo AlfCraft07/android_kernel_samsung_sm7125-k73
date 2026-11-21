@@ -24,7 +24,7 @@
 /delete-node/ &tz_mem;
 
 / {
-	model = "Samsung Galaxy Tab S6 Lite (2022) Wi-Fi";
+	model = "Samsung GTA4XLVEWIFI EUR PROJECT BRINGUP (board-id,00)";
 	compatible = "samsung,gta4xlvewifi", "qcom,sm7125";
 	chassis-type = "tablet";
 
