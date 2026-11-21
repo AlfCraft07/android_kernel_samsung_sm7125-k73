@@ -54,6 +54,7 @@ jobs:
           make O=out ARCH=arm64 LLVM=1 LLVM_IAS=1 olddefconfig
           cp out/.config out/p613_effective.config
           # Fail fast if critical Android / P613 / KernelSU options were silently dropped by Kconfig
+          missing=0
           for opt in \
             'CONFIG_SECURITY_SELINUX=y' \
             'CONFIG_SECURITY_SELINUX_DEVELOP=y' \
@@ -73,14 +74,19 @@ jobs:
             'CONFIG_KPROBES=y' \
             'CONFIG_HEADERS_INSTALL=y' \
             'CONFIG_KSU=y' \
+            'CONFIG_QCOM_SYSMON=y' \
             'CONFIG_QCOM_Q6V5_PAS=y' \
             'CONFIG_ATH10K_SNOC=y' \
             'CONFIG_BT_QCA=y' \
             'CONFIG_SND_SOC_SM8250=y' \
             'CONFIG_SND_SOC_TAS2562=y' \
             'CONFIG_SND_SOC_WCD938X_SDW=y'; do
-            grep -qx "$opt" out/.config || { echo "MISSING REQUIRED CONFIG: $opt"; exit 1; }
+            if ! grep -qx "$opt" out/.config; then
+              echo "MISSING REQUIRED CONFIG: $opt (actual: $(grep -E "^(# )?${opt%%=*}[= ]" out/.config || echo unset))"
+              missing=1
+            fi
           done
+          [ "$missing" -eq 0 ] || exit 1
           grep -qE '^CONFIG_LSM=".*selinux.*"' out/.config || { echo "SELinux missing from CONFIG_LSM!"; exit 1; }
           # Pre-install UAPI headers so KernelSU's Kbuild sees $(objtree)/usr/include/linux/unistd.h for preinit/runner.elf
           make O=out ARCH=arm64 LLVM=1 LLVM_IAS=1 headers
