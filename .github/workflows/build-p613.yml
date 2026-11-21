@@ -42,6 +42,7 @@ jobs:
           git -C KernelSU checkout 2a60b289
           # Fix Linux 6.13+/7.3 out-of-tree (O=out) Kbuild where $(src) already includes $(srctree) ("../drivers/kernelsu")
           sed -i 's|KSU_KERNEL_DIR := \$(srctree)/\$(src)|KSU_KERNEL_DIR := $(patsubst %/,%,$(dir $(abspath $(lastword $(MAKEFILE_LIST)))))|' KernelSU/kernel/Kbuild
+          grep -q 'KSU_KERNEL_DIR := \$(patsubst' KernelSU/kernel/Kbuild
           ln -sf ../KernelSU/kernel drivers/kernelsu
           grep -q 'kernelsu' drivers/Makefile || printf '\nobj-$(CONFIG_KSU) += kernelsu/\n' >> drivers/Makefile
           grep -q 'drivers/kernelsu/Kconfig' drivers/Kconfig || sed -i '/^endmenu/i source "drivers/kernelsu/Kconfig"' drivers/Kconfig
@@ -90,14 +91,17 @@ jobs:
           done
           [ "$missing" -eq 0 ] || exit 1
           grep -qE '^CONFIG_LSM=".*selinux.*"' out/.config || { echo "SELinux missing from CONFIG_LSM!"; exit 1; }
-          # Pre-install UAPI headers (for KernelSU preinit/runner.elf) and SELinux generated headers (flask.h/av_permissions.h)
-          make O=out ARCH=arm64 LLVM=1 LLVM_IAS=1 headers security/selinux/flask.h
+          # Pre-install UAPI headers so KernelSU's Kbuild sees $(objtree)/usr/include/linux/unistd.h for preinit/runner.elf
+          make O=out ARCH=arm64 LLVM=1 LLVM_IAS=1 headers
 
       - name: Fast Check (P613 DTB, KernelSU & SM7125/P613 Drivers)
         run: |
           set -o pipefail
           export CCACHE_DIR="$HOME/.cache/ccache"
           ccache --max-size=2G
+          # Generate out/security/selinux/{flask.h,av_permissions.h} before compiling drivers/kernelsu/
+          make O=out ARCH=arm64 LLVM=1 LLVM_IAS=1 CC="ccache clang" -j$(nproc) \
+            security/selinux/avc.o 2>&1 | tee fastcheck.log
           make O=out ARCH=arm64 LLVM=1 LLVM_IAS=1 DTC_FLAGS="-@" CC="ccache clang" -j$(nproc) \
             qcom/sm7125-samsung-gta4xlvewifi.dtb \
             drivers/kernelsu/ \
@@ -109,7 +113,7 @@ jobs:
             drivers/regulator/isl98608-regulator.o \
             drivers/power/supply/sm5714-charger.o \
             drivers/power/supply/sm5714-fg.o \
-            sound/soc/qcom/sm8250.o 2>&1 | tee fastcheck.log
+            sound/soc/qcom/sm8250.o 2>&1 | tee -a fastcheck.log
 
       - name: Build Image.gz, SM-P613 DTB, and Modules
         run: |
