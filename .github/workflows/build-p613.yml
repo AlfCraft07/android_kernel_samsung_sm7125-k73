@@ -35,6 +35,15 @@ jobs:
           restore-keys: |
             ${{ runner.os }}-p613-ccache-
 
+      - name: Setup Official KernelSU (tiann/KernelSU main @ 2a60b289)
+        run: |
+          set -euo pipefail
+          git clone --filter=blob:none https://github.com/tiann/KernelSU.git KernelSU
+          git -C KernelSU checkout 2a60b289
+          ln -sf ../KernelSU/kernel drivers/kernelsu
+          grep -q 'kernelsu' drivers/Makefile || printf '\nobj-$(CONFIG_KSU) += kernelsu/\n' >> drivers/Makefile
+          grep -q 'drivers/kernelsu/Kconfig' drivers/Kconfig || sed -i '/^endmenu/i source "drivers/kernelsu/Kconfig"' drivers/Kconfig
+
       - name: Configure Kernel (defconfig + sm7125.config + p613.config)
         run: |
           mkdir -p out
@@ -44,7 +53,7 @@ jobs:
             arch/arm64/configs/p613.config
           make O=out ARCH=arm64 LLVM=1 LLVM_IAS=1 olddefconfig
           cp out/.config out/p613_effective.config
-          # Fail fast if critical Android / P613 options were silently dropped by Kconfig
+          # Fail fast if critical Android / P613 / KernelSU options were silently dropped by Kconfig
           for opt in \
             'CONFIG_SECURITY_SELINUX=y' \
             'CONFIG_SECURITY_SELINUX_DEVELOP=y' \
@@ -60,18 +69,30 @@ jobs:
             'CONFIG_DEBUG_INFO_BTF=y' \
             'CONFIG_HW_RANDOM_QCOM=y' \
             'CONFIG_RTC_DRV_PM8XXX=y' \
-            'CONFIG_FW_LOADER_USER_HELPER=y'; do
+            'CONFIG_FW_LOADER_USER_HELPER=y' \
+            'CONFIG_KPROBES=y' \
+            'CONFIG_HEADERS_INSTALL=y' \
+            'CONFIG_KSU=y' \
+            'CONFIG_QCOM_Q6V5_PAS=y' \
+            'CONFIG_ATH10K_SNOC=y' \
+            'CONFIG_BT_QCA=y' \
+            'CONFIG_SND_SOC_SM8250=y' \
+            'CONFIG_SND_SOC_TAS2562=y' \
+            'CONFIG_SND_SOC_WCD938X_SDW=y'; do
             grep -qx "$opt" out/.config || { echo "MISSING REQUIRED CONFIG: $opt"; exit 1; }
           done
           grep -qE '^CONFIG_LSM=".*selinux.*"' out/.config || { echo "SELinux missing from CONFIG_LSM!"; exit 1; }
+          # Pre-install UAPI headers so KernelSU's Kbuild sees $(objtree)/usr/include/linux/unistd.h for preinit/runner.elf
+          make O=out ARCH=arm64 LLVM=1 LLVM_IAS=1 headers
 
-      - name: Fast Check (P613 DTB & SM7125/P613 Drivers)
+      - name: Fast Check (P613 DTB, KernelSU & SM7125/P613 Drivers)
         run: |
           set -o pipefail
           export CCACHE_DIR="$HOME/.cache/ccache"
           ccache --max-size=2G
           make O=out ARCH=arm64 LLVM=1 LLVM_IAS=1 DTC_FLAGS="-@" CC="ccache clang" -j$(nproc) \
             qcom/sm7125-samsung-gta4xlvewifi.dtb \
+            drivers/kernelsu/kernelsu.o \
             drivers/firmware/qcom/qcom_tzmem.o \
             drivers/soc/qcom/qcom_pd_mapper.o \
             drivers/gpu/drm/msm/adreno/a6xx_catalog.o \
