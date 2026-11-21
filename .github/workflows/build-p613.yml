@@ -40,6 +40,8 @@ jobs:
           set -euo pipefail
           git clone --filter=blob:none https://github.com/tiann/KernelSU.git KernelSU
           git -C KernelSU checkout 2a60b289
+          # Fix Linux 6.13+/7.3 out-of-tree (O=out) Kbuild where $(src) already includes $(srctree) ("../drivers/kernelsu")
+          sed -i 's|KSU_KERNEL_DIR := \$(srctree)/\$(src)|KSU_KERNEL_DIR := $(patsubst %/,%,$(dir $(abspath $(lastword $(MAKEFILE_LIST)))))|' KernelSU/kernel/Kbuild
           ln -sf ../KernelSU/kernel drivers/kernelsu
           grep -q 'kernelsu' drivers/Makefile || printf '\nobj-$(CONFIG_KSU) += kernelsu/\n' >> drivers/Makefile
           grep -q 'drivers/kernelsu/Kconfig' drivers/Kconfig || sed -i '/^endmenu/i source "drivers/kernelsu/Kconfig"' drivers/Kconfig
@@ -88,8 +90,8 @@ jobs:
           done
           [ "$missing" -eq 0 ] || exit 1
           grep -qE '^CONFIG_LSM=".*selinux.*"' out/.config || { echo "SELinux missing from CONFIG_LSM!"; exit 1; }
-          # Pre-install UAPI headers so KernelSU's Kbuild sees $(objtree)/usr/include/linux/unistd.h for preinit/runner.elf
-          make O=out ARCH=arm64 LLVM=1 LLVM_IAS=1 headers
+          # Pre-install UAPI headers (for KernelSU preinit/runner.elf) and SELinux generated headers (flask.h/av_permissions.h)
+          make O=out ARCH=arm64 LLVM=1 LLVM_IAS=1 headers security/selinux/flask.h
 
       - name: Fast Check (P613 DTB, KernelSU & SM7125/P613 Drivers)
         run: |
