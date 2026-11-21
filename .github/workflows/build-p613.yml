@@ -98,7 +98,7 @@ jobs:
           ccache --max-size=2G
           make O=out ARCH=arm64 LLVM=1 LLVM_IAS=1 DTC_FLAGS="-@" CC="ccache clang" -j$(nproc) \
             qcom/sm7125-samsung-gta4xlvewifi.dtb \
-            drivers/kernelsu/kernelsu.o \
+            drivers/kernelsu/ \
             drivers/firmware/qcom/qcom_tzmem.o \
             drivers/soc/qcom/qcom_pd_mapper.o \
             drivers/gpu/drm/msm/adreno/a6xx_catalog.o \
