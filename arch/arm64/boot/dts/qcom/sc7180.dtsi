@@ -2297,23 +2297,24 @@
 			qcom,chipid = <0x06010800>; /* Adreno 618 */
 
 			clocks = <&gpucc GPU_CC_AHB_CLK>,
-				 <&gpucc GPU_CC_CX_GFX3D_CLK>;
+				 <&gpucc GPU_CC_GX_GFX3D_CLK>;
 			clock-names = "iface_clk", "core_clk";
 
-			/* SMMU binding */
 			iommus = <&adreno_smmu 0>;
 
-			/* Zap Shader region from reserved-memory */
+			interconnects = <&gem_noc MASTER_GFX3D 0 &mc_virt SLAVE_EBI1 0>;
+			interconnect-names = "gfx-mem";
+
 			qcom,gpu-quirk-secvid;
+
+			/* ==================================================== */
+			/* ALL SUBNODES MUST COME AFTER ALL PROPERTIES          */
+			/* ==================================================== */
+
 			zap-shader {
 				memory-region = <&gpu_mem>;
 			};
 
-			/* Interconnect / Bus bandwidth scaling */
-			interconnects = <&gem_noc MASTER_GFX3D 0 &mc_virt SLAVE_EBI1 0>;
-			interconnect-names = "gfx-mem";
-
-			/* GMU child device */
 			gmu: qcom,gmu@506a000 {
 				compatible = "qcom,gmu";
 				reg = <0 0x0506a000 0 0x31000>,
@@ -2337,7 +2338,6 @@
 				iommus = <&adreno_smmu 5>;
 			};
 
-			/* Adreno 618 Power Levels (derived from RPMh / OPP table) */
 			qcom,gpu-pwrlevels {
 				#address-cells = <1>;
 				#size-cells = <0>;
