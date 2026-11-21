@@ -7,28 +7,34 @@
 #include <linux/i2c.h>
 #include <linux/kernel.h>
 #include <linux/module.h>
-#include <linux/property.h>
+#include <linux/pm.h>
 #include <linux/power_supply.h>
-#include <linux/regmap.h>
-#include <linux/platform_device.h>
 #include <linux/property.h>
+#include <linux/regmap.h>
+#include <linux/workqueue.h>
 
-#define SM5714_CHG_REG_STATUS1            0x0D
-#define SM5714_CHG_REG_STATUS2            0x0E
-#define SM5714_CHG_REG_STATUS3            0x0F
-#define SM5714_CHG_REG_STATUS4            0x10
-#define SM5714_CHG_REG_STATUS5            0x11
+#define SM5714_CHG_REG_STATUS1		0x0D
+#define SM5714_CHG_REG_STATUS2		0x0E
+#define SM5714_CHG_REG_STATUS3		0x0F
+#define SM5714_CHG_REG_STATUS4		0x10
+#define SM5714_CHG_REG_STATUS5		0x11
 
-#define SM5714_CHG_REG_CNTL1              0x13
-#define SM5714_CHG_REG_VBUSCNTL           0x15
-#define SM5714_CHG_REG_CHGCNTL2           0x18
-#define SM5714_CHG_REG_CHGCNTL4           0x1A
-#define SM5714_CHG_REG_CHGCNTL5           0x1B
+#define SM5714_CHG_REG_CNTL1		0x13
+#define SM5714_CHG_REG_VBUSCNTL		0x15
+#define SM5714_CHG_REG_CHGCNTL2		0x18
+#define SM5714_CHG_REG_CHGCNTL4		0x1A
+#define SM5714_CHG_REG_CHGCNTL5		0x1B
+
+#define SM5714_CHG_POLL_MS		5000
 
 struct sm5714_charger {
 	struct power_supply *psy;
 	struct regmap *regmap;
+	struct delayed_work poll_work;
 	bool use_autostop;
+	int last_online;
+	int last_status;
+	int last_health;
 };
 
 static enum power_supply_property sm5714_charger_props[] = {
@@ -47,7 +53,7 @@ static int chg_set_input_current_limit(struct sm5714_charger *charger, int mA)
 	else
 		offset = ((mA - 100) / 25) & 0x7F;
 
-	return regmap_update_bits(charger->regmap, SM5714_CHG_REG_VBUSCNTL, (0x7F << 0), (offset << 0));
+	return regmap_update_bits(charger->regmap, SM5714_CHG_REG_VBUSCNTL, 0x7F, offset);
 }
 
 static int chg_set_charging_current(struct sm5714_charger *charger, int mA)
@@ -57,14 +63,14 @@ static int chg_set_charging_current(struct sm5714_charger *charger, int mA)
 
 	uA = mA * 1000;
 
-	if (uA < 109375)            /* 109.375 mA */
+	if (uA < 109375)		/* 109.375 mA */
 		offset = 0x07;
-	else if (uA > 3500000)      /* 3500.000 mA */
+	else if (uA > 3500000)		/* 3500.000 mA */
 		offset = 0xE0;
 	else
 		offset = (7 + ((uA - 109375) / 15625)) & 0xFF;
 
-	return regmap_update_bits(charger->regmap, SM5714_CHG_REG_CHGCNTL2, (0xFF << 0), (offset << 0));
+	return regmap_update_bits(charger->regmap, SM5714_CHG_REG_CHGCNTL2, 0xFF, offset);
 }
 
 static int chg_set_topoff_current(struct sm5714_charger *charger, int mA)
@@ -72,81 +78,122 @@ static int chg_set_topoff_current(struct sm5714_charger *charger, int mA)
 	u8 offset;
 
 	if (mA < 100)
-		offset = 0x0;               /* Topoff = 100mA */
+		offset = 0x0;		/* Topoff = 100mA */
 	else if (mA < 800)
-		offset = (mA - 100) / 25;   /* Topoff = 125mA ~ 775mA in 25mA steps */
+		offset = (mA - 100) / 25;
 	else
-		offset = 0x1C;              /* Topoff = 800mA */
+		offset = 0x1C;		/* Topoff = 800mA */
 
-	return regmap_update_bits(charger->regmap, SM5714_CHG_REG_CHGCNTL5, (0x1F << 0), (offset << 0));
+	return regmap_update_bits(charger->regmap, SM5714_CHG_REG_CHGCNTL5, 0x1F, offset);
+}
+
+static int sm5714_charger_read_state(struct sm5714_charger *drv,
+				     int *online, int *status, int *health)
+{
+	unsigned int reg_st1, reg_st2;
+	int error;
+
+	error = regmap_read(drv->regmap, SM5714_CHG_REG_STATUS1, &reg_st1);
+	if (error)
+		return error;
+
+	error = regmap_read(drv->regmap, SM5714_CHG_REG_STATUS2, &reg_st2);
+	if (error)
+		return error;
+
+	if (online)
+		*online = (reg_st1 & BIT(0)) ? 1 : 0;
+
+	if (status) {
+		if (reg_st2 & BIT(5))
+			*status = POWER_SUPPLY_STATUS_FULL;
+		else if (reg_st2 & BIT(3))
+			*status = POWER_SUPPLY_STATUS_CHARGING;
+		else if (reg_st1 & BIT(0))
+			*status = POWER_SUPPLY_STATUS_NOT_CHARGING;
+		else
+			*status = POWER_SUPPLY_STATUS_DISCHARGING;
+	}
+
+	if (health) {
+		if (reg_st1 & BIT(0))
+			*health = POWER_SUPPLY_HEALTH_GOOD;
+		else if (reg_st1 & BIT(2))
+			*health = POWER_SUPPLY_HEALTH_OVERVOLTAGE;
+		else if (reg_st1 & BIT(1))
+			*health = POWER_SUPPLY_HEALTH_UNSPEC_FAILURE;
+		else
+			*health = POWER_SUPPLY_HEALTH_GOOD;
+	}
+
+	return 0;
 }
 
 static int sm5714_charger_get_property(struct power_supply *psy,
-				   enum power_supply_property psp,
-				   union power_supply_propval *val)
+				       enum power_supply_property psp,
+				       union power_supply_propval *val)
 {
-	int error;
+	struct sm5714_charger *drv = power_supply_get_drvdata(psy);
 	unsigned int value;
-	struct sm5714_charger *drv;
+	int online, status, health;
+	int error;
 
-	int status = POWER_SUPPLY_STATUS_UNKNOWN;
-	int health = POWER_SUPPLY_HEALTH_UNKNOWN;
-	unsigned int reg_st1, reg_st2;
-
-	drv = power_supply_get_drvdata(psy);
 	switch (psp) {
 	case POWER_SUPPLY_PROP_PRESENT:
 		error = regmap_read(drv->regmap, SM5714_CHG_REG_STATUS2, &value);
 		if (error)
 			return error;
-		val->intval = (value & (0x1 << 2)) ? 0 : 1;
+		val->intval = (value & BIT(2)) ? 0 : 1;
 		break;
 	case POWER_SUPPLY_PROP_ONLINE:
-		error = regmap_read(drv->regmap, SM5714_CHG_REG_STATUS1, &value);
+		error = sm5714_charger_read_state(drv, &online, NULL, NULL);
 		if (error)
 			return error;
-		val->intval = value & 0x1 ? 1 : 0;
+		val->intval = online;
 		break;
 	case POWER_SUPPLY_PROP_STATUS:
-		error = regmap_read(drv->regmap, SM5714_CHG_REG_STATUS1, &reg_st1);
+		error = sm5714_charger_read_state(drv, NULL, &status, NULL);
 		if (error)
 			return error;
-		error = regmap_read(drv->regmap, SM5714_CHG_REG_STATUS2, &reg_st2);
-		if (error)
-			return error;
-
-		if (reg_st2 & (0x1 << 5))
-			status = POWER_SUPPLY_STATUS_FULL;
-		else if (reg_st2 & (0x1 << 3))
-			status = POWER_SUPPLY_STATUS_CHARGING;
-		else {
-			if (reg_st1 & (0x1 << 0))
-				status = POWER_SUPPLY_STATUS_NOT_CHARGING;
-			else
-				status = POWER_SUPPLY_STATUS_DISCHARGING;
-		}
 		val->intval = status;
 		break;
 	case POWER_SUPPLY_PROP_HEALTH:
-		error = regmap_read(drv->regmap, SM5714_CHG_REG_STATUS1, &value);
+		error = sm5714_charger_read_state(drv, NULL, NULL, &health);
 		if (error)
 			return error;
-		if (value & (0x1 << 0))
-			health = POWER_SUPPLY_HEALTH_GOOD;
-		else {
-			if (value & (0x1 << 2)) {
-				health = POWER_SUPPLY_HEALTH_OVERVOLTAGE;
-			} else if (value & (0x1 << 1)) {
-				/* should be undervoltage */
-				health = POWER_SUPPLY_HEALTH_UNKNOWN;
-			}
-		}
 		val->intval = health;
 		break;
 	default:
 		return -EINVAL;
 	}
 	return 0;
+}
+
+static void sm5714_charger_poll_work(struct work_struct *work)
+{
+	struct sm5714_charger *drv = container_of(work, struct sm5714_charger, poll_work.work);
+	int online, status, health;
+
+	if (sm5714_charger_read_state(drv, &online, &status, &health) == 0) {
+		if (online != drv->last_online ||
+		    status != drv->last_status ||
+		    health != drv->last_health) {
+			struct power_supply *fg_psy;
+
+			drv->last_online = online;
+			drv->last_status = status;
+			drv->last_health = health;
+			power_supply_changed(drv->psy);
+
+			fg_psy = power_supply_get_by_name("sm5714_fg");
+			if (fg_psy) {
+				power_supply_changed(fg_psy);
+				power_supply_put(fg_psy);
+			}
+		}
+	}
+
+	schedule_delayed_work(&drv->poll_work, msecs_to_jiffies(SM5714_CHG_POLL_MS));
 }
 
 static const struct power_supply_desc sm5714_charger_desc = {
@@ -159,8 +206,7 @@ static const struct power_supply_desc sm5714_charger_desc = {
 
 static const struct regmap_config sm5714_charger_regmap = {
 	.reg_bits	= 8,
-	.val_bits	= 16,
-	.val_format_endian = REGMAP_ENDIAN_LITTLE,
+	.val_bits	= 8,
 };
 
 static int sm5714_charger_probe(struct i2c_client *i2c)
@@ -171,11 +217,15 @@ static int sm5714_charger_probe(struct i2c_client *i2c)
 	struct sm5714_charger *drv;
 	u32 input_current_limit = 500, charging_current = 500, topoff_current = 100;
 
-	drv = devm_kzalloc(&i2c->dev, sizeof(*drv), GFP_KERNEL);
+	drv = devm_kzalloc(dev, sizeof(*drv), GFP_KERNEL);
 	if (!drv)
 		return -ENOMEM;
 
+	drv->last_online = -1;
+	drv->last_status = -1;
+	drv->last_health = -1;
 	charger_cfg.drv_data = drv;
+	i2c_set_clientdata(i2c, drv);
 
 	drv->regmap = devm_regmap_init_i2c(i2c, &sm5714_charger_regmap);
 	if (IS_ERR(drv->regmap))
@@ -183,8 +233,8 @@ static int sm5714_charger_probe(struct i2c_client *i2c)
 
 	drv->use_autostop = device_property_read_bool(dev, "siliconmitus,enable-autostop");
 
-	error = regmap_update_bits(drv->regmap, SM5714_CHG_REG_CHGCNTL4, (0x1 << 6),
-							(drv->use_autostop << 6));
+	error = regmap_update_bits(drv->regmap, SM5714_CHG_REG_CHGCNTL4, BIT(6),
+				   drv->use_autostop ? BIT(6) : 0);
 	if (error)
 		return dev_err_probe(dev, error, "Unable to set autostop register\n");
 
@@ -206,20 +256,48 @@ static int sm5714_charger_probe(struct i2c_client *i2c)
 	if (error)
 		return dev_err_probe(dev, error, "Unable to set topoff current\n");
 
-	error = regmap_update_bits(drv->regmap, SM5714_CHG_REG_CNTL1, (0x1 << 3), (1 << 3));
+	error = regmap_update_bits(drv->regmap, SM5714_CHG_REG_CNTL1, BIT(3), BIT(3));
 	if (error)
 		return dev_err_probe(dev, error, "Unable to enable charging\n");
 
-	drv->psy = devm_power_supply_register(dev, &sm5714_charger_desc,
-							&charger_cfg);
-
+	drv->psy = devm_power_supply_register(dev, &sm5714_charger_desc, &charger_cfg);
 	if (IS_ERR(drv->psy)) {
 		dev_err(dev, "failed to register power supply\n");
 		return PTR_ERR(drv->psy);
 	}
 
+	INIT_DELAYED_WORK(&drv->poll_work, sm5714_charger_poll_work);
+	schedule_delayed_work(&drv->poll_work, msecs_to_jiffies(1000));
+
 	return 0;
 }
+
+static void sm5714_charger_remove(struct i2c_client *i2c)
+{
+	struct sm5714_charger *drv = i2c_get_clientdata(i2c);
+
+	cancel_delayed_work_sync(&drv->poll_work);
+}
+
+static int sm5714_charger_suspend(struct device *dev)
+{
+	struct sm5714_charger *drv = dev_get_drvdata(dev);
+
+	cancel_delayed_work_sync(&drv->poll_work);
+	return 0;
+}
+
+static int sm5714_charger_resume(struct device *dev)
+{
+	struct sm5714_charger *drv = dev_get_drvdata(dev);
+
+	schedule_delayed_work(&drv->poll_work, msecs_to_jiffies(200));
+	return 0;
+}
+
+static DEFINE_SIMPLE_DEV_PM_OPS(sm5714_charger_pm_ops,
+				sm5714_charger_suspend,
+				sm5714_charger_resume);
 
 static const struct i2c_device_id sm5714_i2c_ids[] = {
 	{ "sm5714-charger", 0 },
@@ -237,9 +315,11 @@ static struct i2c_driver sm5714_charger_driver = {
 	.driver = {
 		.name = "sm5714-charger",
 		.of_match_table = sm5714_of_match_table,
+		.pm = pm_sleep_ptr(&sm5714_charger_pm_ops),
 	},
-	.probe	= sm5714_charger_probe,
-	.id_table   = sm5714_i2c_ids,
+	.probe		= sm5714_charger_probe,
+	.remove		= sm5714_charger_remove,
+	.id_table	= sm5714_i2c_ids,
 };
 
 module_i2c_driver(sm5714_charger_driver);

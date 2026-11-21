@@ -165,7 +165,7 @@
 
 		rmtfs_mem: memory@b5000000 {
 			compatible = "qcom,rmtfs-mem";
-			reg = <0x0 0xb5000000 0x0 0x200000>;
+			reg = <0x0 0xb5000000 0x0 0x202000>;
 			qcom,use-guard-pages;
 			no-map;
 
