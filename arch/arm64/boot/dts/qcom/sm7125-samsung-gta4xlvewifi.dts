@@ -432,12 +432,11 @@
 	status = "okay";
 };
 
-&gpu {
+&kgsl_3d0 {
 	status = "okay";
-};
-
-&gpu_zap_shader {
-	firmware-name = "qcom/sm7125/Samsung/gta4xlvewifi/a615_zap.mbn";
+	zap-shader {
+		firmware-name = "qcom/sm7125/Samsung/gta4xlvewifi/a615_zap.mbn";
+	};
 };
 
 &i2c0 {

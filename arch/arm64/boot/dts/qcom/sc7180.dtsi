@@ -2319,10 +2319,6 @@
 			qcom,id = <0>;
 			qcom,chipid = <0x06010800>; /* Adreno 618 */
 
-			clocks = <&gpucc GPU_CC_AHB_CLK>,
-				 <&gpucc GPU_CC_GX_GFX3D_CLK>;
-			clock-names = "iface_clk", "core_clk";
-
 			iommus = <&adreno_smmu 0>;
 
 			interconnects = <&gem_noc MASTER_GFX3D 0 &mc_virt SLAVE_EBI1 0>;
