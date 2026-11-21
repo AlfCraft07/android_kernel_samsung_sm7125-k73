@@ -82,6 +82,8 @@ struct hx83102_panel_desc {
 	} size;
 
 	bool has_backlight;
+	const char *bl_name;
+	bool samsung_pwm_curve;
 	unsigned long mode_flags;
 
 	int (*init)(struct hx83102 *ctx);
@@ -1213,6 +1215,8 @@ static const struct hx83102_panel_desc boe_tv104wum_desc = {
 		.height_mm = 226,
 	},
 	.has_backlight = true,
+	.bl_name = "panel0-backlight",
+	.samsung_pwm_curve = true,
 	.init = boe_tv104wum_init,
 };
 
@@ -1351,11 +1355,38 @@ static const struct drm_panel_funcs hx83102_drm_funcs = {
 	.get_orientation = hx83102_get_orientation,
 };
 
+static u16 hx83102_samsung_pwm_map(u16 bl_level)
+{
+	/*
+	 * Matches Samsung stock ss_dsi_panel_HX83102_TV104WUM.c tft_pwm():
+	 *   0        -> 0     (0 nits)
+	 *   1..2     -> 32    (4 nits)
+	 *   3..128   -> 32..1365 (up to 190 nits)
+	 *   129..255 -> 1365..2983 (up to 400 nits)
+	 *   256..425 -> 2983..3553 (outdoor HBM up to 480 nits)
+	 */
+	if (bl_level == 0)
+		return 0;
+	if (bl_level <= 2)
+		return 32;
+	if (bl_level <= 128)
+		return (u16)((bl_level * 1365U) / 128U);
+	if (bl_level <= 255)
+		return (u16)(1365U + ((bl_level - 128U) * (2983U - 1365U)) / (255U - 128U));
+	if (bl_level <= 425)
+		return (u16)(2983U + ((bl_level - 255U) * (3553U - 2983U)) / (425U - 255U));
+	return 3553;
+}
+
 static int hx83102_bl_update_status(struct backlight_device *bl)
 {
-	struct mipi_dsi_device *dsi = bl_get_data(bl);
+	struct hx83102 *ctx = bl_get_data(bl);
+	struct mipi_dsi_device *dsi = ctx->dsi;
 	u16 brightness = backlight_get_brightness(bl);
 	int ret;
+
+	if (ctx->desc->samsung_pwm_curve)
+		brightness = hx83102_samsung_pwm_map(brightness);
 
 	dsi->mode_flags &= ~MIPI_DSI_MODE_LPM;
 
@@ -1370,9 +1401,13 @@ static int hx83102_bl_update_status(struct backlight_device *bl)
 
 static int hx83102_bl_get_brightness(struct backlight_device *bl)
 {
-	struct mipi_dsi_device *dsi = bl_get_data(bl);
+	struct hx83102 *ctx = bl_get_data(bl);
+	struct mipi_dsi_device *dsi = ctx->dsi;
 	u16 brightness;
 	int ret;
+
+	if (ctx->desc->samsung_pwm_curve)
+		return bl->props.brightness;
 
 	dsi->mode_flags &= ~MIPI_DSI_MODE_LPM;
 
@@ -1391,16 +1426,17 @@ static const struct backlight_ops hx83102_bl_ops = {
 };
 
 static struct backlight_device *
-hx83102_create_dcs_backlight(struct mipi_dsi_device *dsi)
+hx83102_create_dcs_backlight(struct hx83102 *ctx)
 {
-	struct device *dev = &dsi->dev;
+	struct device *dev = &ctx->dsi->dev;
+	const char *name = ctx->desc->bl_name ? ctx->desc->bl_name : dev_name(dev);
 	const struct backlight_properties props = {
 		.type = BACKLIGHT_RAW,
-		.brightness = 4095,
-		.max_brightness = 4095,
+		.brightness = ctx->desc->samsung_pwm_curve ? 160 : 4095,
+		.max_brightness = ctx->desc->samsung_pwm_curve ? 425 : 4095,
 	};
 
-	return devm_backlight_device_register(dev, dev_name(dev), dev, dsi,
+	return devm_backlight_device_register(dev, name, dev, ctx,
 					      &hx83102_bl_ops, &props);
 }
 
@@ -1437,7 +1473,7 @@ static int hx83102_panel_add(struct hx83102 *ctx)
 
 	/* Use DSI-based backlight as fallback if available */
 	if (ctx->desc->has_backlight && !ctx->base.backlight) {
-		ctx->base.backlight = hx83102_create_dcs_backlight(ctx->dsi);
+		ctx->base.backlight = hx83102_create_dcs_backlight(ctx);
 		if (IS_ERR(ctx->base.backlight))
 			return dev_err_probe(dev, PTR_ERR(ctx->base.backlight),
 					     "Failed to create backlight\n");
