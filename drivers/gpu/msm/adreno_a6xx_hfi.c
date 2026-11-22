@@ -244,7 +244,10 @@ int a6xx_receive_ack_cmd(struct a6xx_gmu_device *gmu, void *rcvd,
 	if (ret_cmd == NULL)
 		return -EINVAL;
 
-	if (CMP_HFI_ACK_HDR(ret_cmd->sent_hdr, req_hdr)) {
+	if (CMP_HFI_ACK_HDR(ret_cmd->sent_hdr, req_hdr) ||
+	    (GMU_VER_MAJOR(device->gmu_core.ver.hfi) < 2 &&
+	     MSG_HDR_GET_SIZE(req_hdr) == 0 &&
+	     (ret_cmd->sent_hdr & ~GENMASK(15, 8)) == req_hdr)) {
 		memcpy(&ret_cmd->results, ack, MSG_HDR_GET_SIZE(hdr) << 2);
 		return 0;
 	}

@@ -2733,7 +2733,6 @@ int a6xx_gmu_probe(struct kgsl_device *device,
 	if (ret < 0)
 		return ret;
 
-	dev_info(dev, "kgsl-gmu: iommu_init\n");
 	/* Set up GMU IOMMU and shared memory with GMU */
 	ret = gmu_core_iommu_init(device);
 	if (ret)
@@ -2752,12 +2751,10 @@ int a6xx_gmu_probe(struct kgsl_device *device,
 	if (ret)
 		goto error;
 
-	dev_info(dev, "kgsl-gmu: build_rpmh_tables\n");
 	/* Populates RPMh configurations */
 	ret = a6xx_build_rpmh_tables(adreno_dev);
 	if (ret)
 		goto error;
-	dev_info(dev, "kgsl-gmu: rpmh_tables ok\n");
 
 	/* Set up GMU idle state */
 	if (ADRENO_FEATURE(adreno_dev, ADRENO_IFPC)) {
