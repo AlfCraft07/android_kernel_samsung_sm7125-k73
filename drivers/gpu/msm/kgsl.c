@@ -13,7 +13,6 @@
 #include <linux/dma-map-ops.h>
 #include <linux/fdtable.h>
 #include <linux/io.h>
-#include <linux/mem-buf.h>
 #include <linux/mman.h>
 #include <linux/mm_types.h>
 #include <linux/msm_kgsl.h>
@@ -28,6 +27,10 @@
 #include <soc/qcom/of_common.h>
 #include <soc/qcom/secure_buffer.h>
 #include <trace/hooks/mm.h>
+
+#if IS_ENABLED(CONFIG_QCOM_MEM_BUF)
+#include <linux/mem-buf.h>
+#endif
 
 #include "kgsl_compat.h"
 #include "kgsl_debugfs.h"
