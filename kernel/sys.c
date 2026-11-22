@@ -1343,7 +1343,7 @@ static int override_release(char __user *release, size_t len)
 		char buf[65] = { 0 };
 		size_t copy = clamp_t(size_t, len, 1, sizeof(buf));
 
-		copy = scnprintf(buf, copy, "6.18.0-sm7125-p613+");
+		copy = scnprintf(buf, copy, "6.18.33-sm7125-p613+");
 		return copy_to_user(release, buf, copy + 1);
 	}
 

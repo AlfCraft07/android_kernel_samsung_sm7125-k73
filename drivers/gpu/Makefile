@@ -6,6 +6,7 @@
 obj-$(CONFIG_GPU_BUDDY)	+= buddy.o
 obj-y			+= host1x/ drm/ vga/ tests/
 obj-$(CONFIG_IMX_IPUV3_CORE)	+= ipu-v3/
+obj-$(CONFIG_QCOM_KGSL)		+= msm/
 obj-$(CONFIG_TRACE_GPU_MEM)		+= trace/
 
 # nova-core and nova-drm are built from this Makefile so nova-drm's dependency
