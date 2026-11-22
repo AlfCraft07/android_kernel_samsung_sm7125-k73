@@ -1482,6 +1482,16 @@ int kgsl_drawobj_cmd_add_cmdlist(struct kgsl_device *device,
 	if (ret <= 0)
 		return ret;
 
+	/*
+	 * Legacy Adreno userspace (e.g. V@0502.0 libgsl.so) passes total array
+	 * bytes (count * sizeof(obj)) in cmdsize/objsize/syncsize instead of
+	 * the per-element struct size. Legacy 4.14 KGSL used min(ksize, usize)
+	 * per element, whereas copy_struct_from_user() checks trailing bytes
+	 * for zero and rejects count > 1 submissions with -E2BIG -> -EFAULT.
+	 */
+	if (count > 1 && size == (u64)count * sizeof(obj))
+		size = sizeof(obj);
+
 	for (i = 0; i < count; i++) {
 		if (copy_struct_from_user(&obj, sizeof(obj), ptr, size))
 			return -EFAULT;
@@ -1520,6 +1530,9 @@ int kgsl_drawobj_cmd_add_memlist(struct kgsl_device *device,
 	ret = _verify_input_list(count, ptr, size);
 	if (ret <= 0)
 		return ret;
+
+	if (count > 1 && size == (u64)count * sizeof(obj))
+		size = sizeof(obj);
 
 	for (i = 0; i < count; i++) {
 		if (copy_struct_from_user(&obj, sizeof(obj), ptr, size))
@@ -1592,6 +1605,9 @@ int kgsl_drawobj_sync_add_synclist(struct kgsl_device *device,
 	ret = _verify_input_list(count, ptr, size);
 	if (ret <= 0)
 		return -EINVAL;
+
+	if (count > 1 && size == (u64)count * sizeof(syncpoint))
+		size = sizeof(syncpoint);
 
 	syncobj->synclist = kcalloc(count,
 		sizeof(struct kgsl_drawobj_sync_event), GFP_KERNEL);
