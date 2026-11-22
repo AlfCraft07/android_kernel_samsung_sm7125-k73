@@ -17,6 +17,10 @@ int adreno_rpmh_arc_cmds(struct rpmh_arc_vals *arc, const char *res_id)
 	bool dummy_res = true;
 
 	arc->val = cmd_db_read_aux_data(res_id, &len);
+	if (IS_ERR(arc->val))
+		return PTR_ERR(arc->val);
+	if (!len)
+		return -ENODATA;
 
 	/*
 	 * cmd_db_read_aux_data() gives us a zero-padded table of
@@ -194,6 +198,10 @@ struct rpmh_bw_votes *adreno_rpmh_build_bw_votes(struct bcm *bcms, int bcm_count
 		const struct bcm_data *data;
 
 		data = cmd_db_read_aux_data(bcms[i].name, &l);
+		if (IS_ERR(data)) {
+			adreno_rpmh_free_bw_votes(votes);
+			return ERR_CAST(data);
+		}
 
 		votes->addrs[i] = cmd_db_read_addr(bcms[i].name);
 

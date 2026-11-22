@@ -3081,12 +3081,14 @@ int kgsl_iommu_probe_standard(struct kgsl_device *device, struct platform_device
 		set_bit(KGSL_MMU_IOPGTABLE, &mmu->features);
 
 	/* Setup iommu default non secure context */
+	dev_info(&pdev->dev, "kgsl-iommu: setup_context_standard\n");
 	ret = kgsl_iommu_setup_context_standard(mmu, node, &iommu->user_context,
 		"gfx3d_user", kgsl_iommu_default_fault_handler);
 	if (ret)
 		goto err;
 
 	/* Make the default pagetable */
+	dev_info(&pdev->dev, "kgsl-iommu: default_pagetable\n");
 	mmu->defaultpagetable = kgsl_iommu_default_pagetable(mmu);
 	if (IS_ERR(mmu->defaultpagetable)) {
 		ret = PTR_ERR(mmu->defaultpagetable);
@@ -3100,7 +3102,9 @@ int kgsl_iommu_probe_standard(struct kgsl_device *device, struct platform_device
 	pt = to_iommu_pt(mmu->defaultpagetable);
 
 	/* Enable TTBR0 on the default context */
+	dev_info(&pdev->dev, "kgsl-iommu: set_ttbr0\n");
 	kgsl_iommu_set_ttbr0(&iommu->user_context, mmu, &pt->cfg);
+	dev_info(&pdev->dev, "kgsl-iommu: set_ttbr0 done\n");
 
 	/* Map any globals that might have been created early */
 	kgsl_iommu_map_globals(device, mmu);

@@ -2178,6 +2178,7 @@ int adreno_device_probe(struct platform_device *pdev,
 	if (status)
 		kgsl_regmap_add_region(&device->regmap, pdev, "cx_misc", -EINVAL, NULL, NULL);
 
+	dev_info(dev, "kgsl-probe: chipid=0x%08x speedbin/bus/pwrlevels\n", adreno_dev->chipid);
 	status = adreno_setup_speedbin(device);
 	if (status)
 		goto err;
@@ -2191,6 +2192,8 @@ int adreno_device_probe(struct platform_device *pdev,
 		goto err;
 
 	validate_pwrlevels(device);
+	dev_info(dev, "kgsl-probe: pwrlevels=%u ddr_count=%u\n",
+		device->pwrctrl.num_pwrlevels, device->pwrctrl.ddr_table_count);
 
 	/*
 	 * The SMMU APIs use unsigned long for virtual addresses which means
@@ -2248,10 +2251,12 @@ int adreno_device_probe(struct platform_device *pdev,
 		!adreno_is_gen7_14_0_family(adreno_dev)))
 		kgsl_mmu_set_feature(device, KGSL_MMU_FORCE_LLCC_NWA);
 
+	dev_info(dev, "kgsl-probe: binding components\n");
 	status = adreno_bind_components(dev);
 	if (status)
 		goto err_remove_llcc;
 
+	dev_info(dev, "kgsl-probe: components bound, irq & platform_probe\n");
 	status = adreno_irq_setup(pdev, adreno_dev);
 	if (status < 0)
 		goto err_unbind;
@@ -2267,6 +2272,7 @@ int adreno_device_probe(struct platform_device *pdev,
 	status = kgsl_device_platform_probe(device);
 	if (status)
 		goto err_unbind;
+	dev_info(dev, "kgsl-probe: platform_probe ok, memstore/ubwc/pwrscale\n");
 
 	adreno_fence_trace_array_init(device);
 
