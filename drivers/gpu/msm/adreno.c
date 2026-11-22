@@ -2061,7 +2061,7 @@ static void adreno_init_mal(struct adreno_device *adreno_dev)
 #if (KERNEL_VERSION(6, 17, 0) <= LINUX_VERSION_CODE)
 static int adreno_init_ubwc(struct adreno_device *adreno_dev)
 {
-	struct qcom_ubwc_cfg_data *cfg = qcom_ubwc_config_get_data();
+	const struct qcom_ubwc_cfg_data *cfg = qcom_ubwc_config_get_data();
 	struct kgsl_device *device = KGSL_DEVICE(adreno_dev);
 	/* Extract the UBWC major version from ubwc_enc_version[31:28].
 	 * If cfg is NULL, default to KGSL_UBWC_NONE.

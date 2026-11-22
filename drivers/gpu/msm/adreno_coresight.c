@@ -221,6 +221,13 @@ static int adreno_coresight_enable(struct coresight_device *csdev,
 {
 	return _adreno_coresight_enable(csdev, event, mode);
 }
+#elif (KERNEL_VERSION(6, 15, 0) <= LINUX_VERSION_CODE)
+static int adreno_coresight_enable(struct coresight_device *csdev,
+				struct perf_event *event, enum cs_mode mode,
+				struct coresight_path *path)
+{
+	return _adreno_coresight_enable(csdev, event, mode);
+}
 #else
 static int adreno_coresight_enable(struct coresight_device *csdev,
 				struct perf_event *event, enum cs_mode mode)

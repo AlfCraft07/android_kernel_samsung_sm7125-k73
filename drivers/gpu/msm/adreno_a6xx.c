@@ -234,7 +234,7 @@ static void a6xx_calc_ubwc_config(struct adreno_device *adreno_dev)
 #elif (KERNEL_VERSION(6, 17, 0) <= LINUX_VERSION_CODE)
 static void a6xx_calc_ubwc_config(struct adreno_device *adreno_dev)
 {
-	struct qcom_ubwc_cfg_data *cfg = (struct qcom_ubwc_cfg_data *)adreno_dev->ubwc_cfg_data;
+	const struct qcom_ubwc_cfg_data *cfg = (const struct qcom_ubwc_cfg_data *)adreno_dev->ubwc_cfg_data;
 	struct adreno_ubwc_props *ubwc_props = &adreno_dev->ubwc_props;
 
 	if (!cfg)
@@ -600,7 +600,7 @@ static void a6xx_deassert_gbif_halt(struct adreno_device *adreno_dev)
 		kgsl_regwrite(device, A6XX_RBBM_GBIF_HALT, 0x0);
 }
 
-bool a6xx_gx_is_on(struct adreno_device *adreno_dev)
+static bool a6xx_gx_is_on(struct adreno_device *adreno_dev)
 {
 	struct kgsl_device *device = KGSL_DEVICE(adreno_dev);
 	struct kgsl_pwrctrl *pwr = &device->pwrctrl;
@@ -1313,7 +1313,7 @@ static bool a619_holi_hw_isidle(struct adreno_device *adreno_dev)
 	return a6xx_irq_pending(adreno_dev) ? false : true;
 }
 
-bool a6xx_hw_isidle(struct adreno_device *adreno_dev)
+static bool a6xx_hw_isidle(struct adreno_device *adreno_dev)
 {
 	struct kgsl_device *device = KGSL_DEVICE(adreno_dev);
 	unsigned int reg;
