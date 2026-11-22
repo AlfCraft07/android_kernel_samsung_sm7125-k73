@@ -869,6 +869,12 @@ static const struct adreno_a6xx_core adreno_gpu_core_a618 = {
 		.bus_width = 32,
 		.snapshot_size = SZ_1M,
 		.highest_bank_bit = 14,
+		.speedbins = KGSL_SPEEDBINS(
+			{ 0,   0 },
+			{ 169, 1 },
+			{ 174, 2 },
+			{ 159, 3 },
+		),
 	},
 	.prim_fifo_threshold = 0x0018000,
 	.gmu_major = 1,

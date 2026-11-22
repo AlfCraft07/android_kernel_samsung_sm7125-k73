@@ -2943,6 +2943,9 @@ static int kgsl_iommu_setup_context_standard(struct kgsl_mmu *mmu,
 	struct platform_device *pdev;
 	int ret;
 
+	/* kgsl_iommu_setup_context_common() and error paths release one ref */
+	of_node_get(node);
+
 	pdev = of_find_device_by_node(node);
 	if (!pdev) {
 		ret = -ENODEV;

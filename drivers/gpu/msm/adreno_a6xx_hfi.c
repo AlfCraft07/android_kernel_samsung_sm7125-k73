@@ -447,10 +447,10 @@ static int a6xx_hfi_send_dcvstbl_v1(struct adreno_device *adreno_dev)
 		cmd.gx_votes[i].freq = table->gx_votes[i].freq;
 	}
 
-	cmd.cx_votes[0].vote = table->cx_votes[0].vote;
-	cmd.cx_votes[0].freq = table->cx_votes[0].freq;
-	cmd.cx_votes[1].vote = table->cx_votes[1].vote;
-	cmd.cx_votes[1].freq = table->cx_votes[1].freq;
+	for (i = 0; i < table->gmu_level_num && i < MAX_CX_LEVELS_LEGACY; i++) {
+		cmd.cx_votes[i].vote = table->cx_votes[i].vote;
+		cmd.cx_votes[i].freq = table->cx_votes[i].freq;
+	}
 
 	return a6xx_hfi_send_generic_req(adreno_dev, &cmd, sizeof(cmd));
 }

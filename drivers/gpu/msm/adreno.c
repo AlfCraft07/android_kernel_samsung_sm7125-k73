@@ -884,6 +884,15 @@ adreno_update_soc_hw_revision_quirks(struct adreno_device *adreno_dev,
 		if (of_property_read_bool(node, adreno_quirks[i].prop))
 			adreno_dev->quirks |= adreno_quirks[i].quirk;
 	}
+
+	/*
+	 * Upstream DT bindings for Adreno 618 (SC7180/SM7125) do not carry
+	 * downstream qcom,gpu-quirk-* properties, but a630_gmu.bin (HFI v1)
+	 * requires register-based GMU OOB/DCVS/slumber and single SECVID setup.
+	 */
+	if (adreno_is_a618(adreno_dev))
+		adreno_dev->quirks |= ADRENO_QUIRK_HFI_USE_REG |
+				      ADRENO_QUIRK_SECVID_SET_ONCE;
 }
 
 static const struct adreno_gpu_core *
@@ -1496,7 +1505,7 @@ static int adreno_of_get_power(struct adreno_device *adreno_dev,
 }
 
 /* Read the fuse through the new and fancy nvmem method */
-static int adreno_read_fuse(struct platform_device *pdev, const char *fuse)
+static int __maybe_unused adreno_read_fuse(struct platform_device *pdev, const char *fuse)
 {
 	struct nvmem_cell *cell = nvmem_cell_get(&pdev->dev, fuse);
 	int ret = PTR_ERR_OR_ZERO(cell);
@@ -1523,7 +1532,7 @@ static int adreno_read_fuse(struct platform_device *pdev, const char *fuse)
 	return val;
 }
 
-static void adreno_read_soc_code(struct kgsl_device *device)
+static void __maybe_unused adreno_read_soc_code(struct kgsl_device *device)
 {
 	int feature_code, pcode;
 	bool internal_sku;
