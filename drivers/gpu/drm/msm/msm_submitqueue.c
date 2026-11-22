@@ -202,7 +202,11 @@ int msm_submitqueue_create(struct drm_device *drm, struct msm_context *ctx,
 		sz = struct_size(queue, _vm_bind_entity, 1);
 		queue = kzalloc(sz, GFP_KERNEL);
 	} else {
+#if IS_ENABLED(CONFIG_QCOM_KGSL)
+		const int enable_preemption = 0;
+#else
 		extern int enable_preemption;
+#endif
 		bool preemption_supported =
 			priv->gpu->nr_rings == 1 && enable_preemption != 0;
 
