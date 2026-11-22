@@ -27,11 +27,7 @@
 #include <soc/qcom/of_common.h>
 #include <soc/qcom/secure_buffer.h>
 #include <trace/hooks/mm.h>
-
-#if IS_ENABLED(CONFIG_QCOM_MEM_BUF)
 #include <linux/mem-buf.h>
-#endif
-
 #include "kgsl_compat.h"
 #include "kgsl_debugfs.h"
 #include "kgsl_device.h"
