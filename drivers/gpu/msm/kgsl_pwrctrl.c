@@ -1633,8 +1633,8 @@ static int kgsl_pwrctrl_probe_cx_gdsc(struct kgsl_device *device, struct platfor
 
 		pwr->gmu_cx_pd = dev_pm_domain_attach_by_name(&pdev->dev, "gmu_cx");
 		if (IS_ERR_OR_NULL(pwr->gmu_cx_pd)) {
-			dev_err(device->dev,
-				"Failed to attach GMU cx power domain, falling back to cx pd\n");
+			dev_dbg(&pdev->dev,
+				"GMU cx power domain absent, falling back to cx pd\n");
 			/* Fallback to cx pd voting if gmu_cx pd is unavailable */
 			pwr->gmu_cx_pd = cx_pd;
 		}

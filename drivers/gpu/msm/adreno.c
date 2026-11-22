@@ -767,12 +767,23 @@ _get_gpu_core_standard(struct platform_device *pdev, u32 *chipid)
 	for (i = 0; i < ARRAY_SIZE(adreno_gpulist); i++) {
 		u32 entry = adreno_gpulist[i]->chipid;
 
-		if (entry == lookup_chipid ||
-		    (ADRENO_CHIPID_CORE(entry) == ADRENO_CHIPID_CORE(lookup_chipid) &&
-		     ADRENO_CHIPID_MAJOR(entry) == ADRENO_CHIPID_MAJOR(lookup_chipid) &&
-		     ADRENO_CHIPID_MINOR(entry) == ADRENO_CHIPID_MINOR(lookup_chipid) &&
-		     _rev_match(ADRENO_CHIPID_PATCH(lookup_chipid),
-				ADRENO_CHIPID_PATCH(entry)))) {
+		if (entry) {
+			if (entry == lookup_chipid ||
+			    (ADRENO_CHIPID_CORE(entry) == ADRENO_CHIPID_CORE(lookup_chipid) &&
+			     ADRENO_CHIPID_MAJOR(entry) == ADRENO_CHIPID_MAJOR(lookup_chipid) &&
+			     ADRENO_CHIPID_MINOR(entry) == ADRENO_CHIPID_MINOR(lookup_chipid) &&
+			     _rev_match(ADRENO_CHIPID_PATCH(lookup_chipid),
+					ADRENO_CHIPID_PATCH(entry)))) {
+				*chipid = lookup_chipid;
+				return adreno_gpulist[i];
+			}
+		} else if (adreno_gpulist[i]->core == ADRENO_CHIPID_CORE(lookup_chipid) &&
+			   _rev_match(ADRENO_CHIPID_MAJOR(lookup_chipid),
+				      adreno_gpulist[i]->major) &&
+			   _rev_match(ADRENO_CHIPID_MINOR(lookup_chipid),
+				      adreno_gpulist[i]->minor) &&
+			   _rev_match(ADRENO_CHIPID_PATCH(lookup_chipid),
+				      adreno_gpulist[i]->patchid)) {
 			*chipid = lookup_chipid;
 			return adreno_gpulist[i];
 		}
@@ -2072,11 +2083,19 @@ static int adreno_init_ubwc(struct adreno_device *adreno_dev)
 {
 	const struct qcom_ubwc_cfg_data *cfg = qcom_ubwc_config_get_data();
 	struct kgsl_device *device = KGSL_DEVICE(adreno_dev);
+	u32 ubwc_mode;
+	int ret = 0;
+
+	if (IS_ERR(cfg)) {
+		if (PTR_ERR(cfg) == -EPROBE_DEFER)
+			return -EPROBE_DEFER;
+		cfg = NULL;
+	}
+
 	/* Extract the UBWC major version from ubwc_enc_version[31:28].
 	 * If cfg is NULL, default to KGSL_UBWC_NONE.
 	 */
-	u32 ubwc_mode = cfg ? cfg->ubwc_enc_version >> 28 : KGSL_UBWC_NONE;
-	int ret = 0;
+	ubwc_mode = cfg ? cfg->ubwc_enc_version >> 28 : KGSL_UBWC_NONE;
 
 	if (ubwc_mode != KGSL_UBWC_NONE) {
 		adreno_dev->ubwc_cfg_data = cfg;
