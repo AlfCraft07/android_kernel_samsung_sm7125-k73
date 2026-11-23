@@ -3,7 +3,7 @@ name: Build SM-P613 (gta4xlvewifi) Kernel (android18-7.3)
 on:
   workflow_dispatch:
   push:
-    branches: [ "android18-7.3", "p613/**" ]
+    branches: [ "android18-7.3", "android18-7.3-caf", "p613/**" ]
 
 concurrency:
   group: p613-build-${{ github.ref }}
@@ -83,7 +83,9 @@ jobs:
             'CONFIG_BT_QCA=y' \
             'CONFIG_SND_SOC_SM8250=y' \
             'CONFIG_SND_SOC_TAS2562=y' \
-            'CONFIG_SND_SOC_WCD938X_SDW=y'; do
+            'CONFIG_SND_SOC_WCD938X_SDW=y' \
+            'CONFIG_QCOM_KGSL=y' \
+            'CONFIG_QCOM_KGSL_UPSTREAM=y'; do
             if ! grep -qx "$opt" out/.config; then
               echo "MISSING REQUIRED CONFIG: $opt (actual: $(grep -E "^(# )?${opt%%=*}[= ]" out/.config || echo unset))"
               missing=1
@@ -105,9 +107,10 @@ jobs:
           make O=out ARCH=arm64 LLVM=1 LLVM_IAS=1 DTC_FLAGS="-@" CC="ccache clang" -j$(nproc) \
             qcom/sm7125-samsung-gta4xlvewifi.dtb \
             drivers/kernelsu/ \
+            drivers/gpu/msm/ \
+            drivers/gpu/drm/msm/msm_drv.o \
             drivers/firmware/qcom/qcom_tzmem.o \
             drivers/soc/qcom/qcom_pd_mapper.o \
-            drivers/gpu/drm/msm/adreno/a6xx_catalog.o \
             drivers/gpu/drm/panel/panel-himax-hx83102.o \
             drivers/input/touchscreen/himax_hx83102_spi.o \
             drivers/regulator/isl98608-regulator.o \

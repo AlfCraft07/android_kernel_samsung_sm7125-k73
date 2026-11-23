@@ -1132,8 +1132,13 @@ void usb_gadget_set_state(struct usb_gadget *gadget,
 
 	spin_lock_irqsave(&gadget->state_lock, flags);
 	gadget->state = state;
-	if (!gadget->teardown)
+	if (!gadget->teardown) {
+		if (state == USB_STATE_CONFIGURED)
+			pm_stay_awake(&gadget->dev);
+		else
+			pm_relax(&gadget->dev);
 		schedule_work(&gadget->work);
+	}
 	spin_unlock_irqrestore(&gadget->state_lock, flags);
 	trace_usb_gadget_set_state(gadget, 0);
 }
@@ -1457,6 +1462,8 @@ int usb_add_gadget(struct usb_gadget *gadget)
 	if (ret)
 		goto err_free_id;
 
+	device_init_wakeup(&gadget->dev, true);
+
 	ret = sysfs_create_link(&udc->dev.kobj,
 				&gadget->dev.kobj, "gadget");
 	if (ret)
@@ -1590,6 +1597,7 @@ void usb_del_gadget(struct usb_gadget *gadget)
 	 */
 	spin_lock_irqsave(&gadget->state_lock, flags);
 	gadget->teardown = true;
+	pm_relax(&gadget->dev);
 	spin_unlock_irqrestore(&gadget->state_lock, flags);
 	flush_work(&gadget->work);
 	ida_free(&gadget_id_numbers, gadget->id_number);

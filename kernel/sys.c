@@ -6,6 +6,7 @@
  */
 
 #include <linux/export.h>
+#include <linux/moduleparam.h>
 #include <linux/mm.h>
 #include <linux/mm_inline.h>
 #include <linux/utsname.h>
@@ -1324,9 +1325,27 @@ DECLARE_RWSEM(uts_sem);
  * And we map 4.x and later versions to 2.6.60+x, so 4.0/5.0/6.0/... would be
  * 2.6.60.
  */
+/*
+ * Opt-in compatibility shim for Android 17 (API 3700) Google Tethering APEX
+ * (netd@funcs.o), whose 26Q2 BPF programs cap at kver < 7.3.0 while 7.3.0+
+ * variants require Android 18 (API 3800). Enabled via bpf_kver_compat=1 on
+ * Android 17 boot cmdline; disable once Android 18 / One UI 10 lands.
+ */
+static bool bpf_kver_compat;
+core_param(bpf_kver_compat, bpf_kver_compat, bool, 0644);
+
 static int override_release(char __user *release, size_t len)
 {
 	int ret = 0;
+
+	if (bpf_kver_compat &&
+	    (!strcmp(current->comm, "netbpfload") || !strcmp(current->comm, "netd"))) {
+		char buf[65] = { 0 };
+		size_t copy = clamp_t(size_t, len, 1, sizeof(buf));
+
+		copy = scnprintf(buf, copy, "6.18.33-sm7125-p613+");
+		return copy_to_user(release, buf, copy + 1);
+	}
 
 	if (current->personality & UNAME26) {
 		const char *rest = UTS_RELEASE;
